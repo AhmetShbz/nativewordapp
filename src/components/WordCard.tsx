@@ -1,10 +1,10 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
-  Animated as RNAnimated,
+  Animated,
   TextInput,
   ScrollView,
   Platform,
@@ -12,33 +12,48 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import { words } from '../data/words'; // Doğru yolu belirleyin
 
 const { width, height } = Dimensions.get('window');
-const CARD_HEIGHT = height * 0.75; // Ekran yüksekliğinin %75'i
+const CARD_HEIGHT = height * 0.75;
 
-const WordCard = () => {
+interface Note {
+  id: number;
+  text: string;
+  timestamp: number;
+}
+
+type NoteModalProps = {
+  note: string;
+  onChangeNote: (text: string) => void;
+  onSave: () => void;
+  onClose: () => void;
+};
+
+// Custom Hooks
+const useFlipAnimation = (initialValue = 0) => {
   const [isFlipped, setIsFlipped] = useState(false);
-  const [isFavorite, setIsFavorite] = useState(false);
-  const [progress, setProgress] = useState(0);
-  const [note, setNote] = useState('');
-  const [showNoteInput, setShowNoteInput] = useState(false);
-  const [notes, setNotes] = useState([]);
-  const [editingNoteId, setEditingNoteId] = useState(null);
+  const flipAnimation = useRef(new Animated.Value(initialValue)).current;
 
-  const flipAnimation = useRef(new RNAnimated.Value(0)).current;
+  useEffect(() => {
+    return () => {
+      flipAnimation.removeAllListeners();
+    };
+  }, []);
 
   const flipCard = useCallback(() => {
     const toValue = isFlipped ? 0 : 180;
 
-    RNAnimated.spring(flipAnimation, {
+    Animated.spring(flipAnimation, {
       toValue,
       friction: 8,
       tension: 10,
       useNativeDriver: true,
-    }).start(() => {
-      setIsFlipped(!isFlipped);
-    });
-  }, [isFlipped, flipAnimation]);
+    }).start();
+
+    // State'i hemen güncelle, animasyonun bitmesini bekleme
+    setIsFlipped(!isFlipped);
+  }, [isFlipped]);
 
   const frontAnimatedStyle = {
     transform: [
@@ -62,6 +77,21 @@ const WordCard = () => {
     ],
   };
 
+  return {
+    isFlipped,
+    flipCard,
+    frontAnimatedStyle,
+    backAnimatedStyle,
+  };
+};
+
+// useNotes içinde fonksiyon parametrelerine tipler eklendi
+const useNotes = () => {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [note, setNote] = useState<string>('');
+  const [showNoteInput, setShowNoteInput] = useState<boolean>(false);
+  const [editingNoteId, setEditingNoteId] = useState<number | null>(null);
+
   const handleAddNote = useCallback(() => {
     if (note.trim()) {
       if (editingNoteId) {
@@ -84,58 +114,215 @@ const WordCard = () => {
     }
   }, [note, editingNoteId]);
 
-  const handleEditNote = useCallback((noteToEdit) => {
+  const handleEditNote = useCallback((noteToEdit: Note) => {
     setNote(noteToEdit.text);
     setEditingNoteId(noteToEdit.id);
     setShowNoteInput(true);
   }, []);
-  const handleDeleteNote = useCallback((noteId) => {
+
+  const handleDeleteNote = useCallback((noteId: number) => {
     setNotes(prevNotes => prevNotes.filter(n => n.id !== noteId));
   }, []);
 
-  const renderNoteItem = useCallback((noteItem) => (
-    <View
-      key={noteItem.id}
-      style={styles.noteItem}
-    >
-      <View style={styles.noteContent}>
-        <Text style={styles.noteText}>{noteItem.text}</Text>
-        <Text style={styles.noteTimestamp}>
-          {new Date(noteItem.timestamp).toLocaleDateString()}
-        </Text>
-      </View>
-      <View style={styles.noteActions}>
-        <TouchableOpacity
-          onPress={() => handleEditNote(noteItem)}
-          style={[styles.noteActionButton, styles.editButton]}
-        >
-          <Ionicons name="pencil" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => handleDeleteNote(noteItem.id)}
-          style={[styles.noteActionButton, styles.deleteButton]}
-        >
-          <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  ), [handleEditNote, handleDeleteNote]);
+  return {
+    notes: [...notes].sort((a, b) => b.timestamp - a.timestamp),  // Array'i kopyalayarak mutasyonu önledik
+    note,
+    showNoteInput,
+    editingNoteId,
+    setNote,
+    setShowNoteInput,
+    handleAddNote,
+    handleEditNote,
+    handleDeleteNote,
+  };
+};
 
-  // Sort notes by timestamp in reverse order
-  const sortedNotes = [...notes].sort((a, b) => b.timestamp - a.timestamp);
+const useProgress = () => {
+  const [progress, setProgress] = useState(0);
+
+  const increaseProgress = useCallback(() => {
+    setProgress(prev => Math.min(100, prev + 10));
+  }, []);
+
+  const decreaseProgress = useCallback(() => {
+    setProgress(prev => Math.max(0, prev - 10));
+  }, []);
+
+  return {
+    progress,
+    increaseProgress,
+    decreaseProgress,
+  };
+};
+
+// Level için özel bir tip tanımı
+type Level = 'A1' | 'A2' | 'B1' | 'B2' | 'C1' | 'C2';
+
+// CardHeaderProps güncellendi
+type CardHeaderProps = {
+  level?: Level | string;  // level opsiyonel yapıldı
+  isFavorite: boolean;
+  onToggleFavorite: () => void;
+  onPlaySound: () => void;
+};
+
+// WordCardProps güncellendi
+type WordCardProps = {
+  wordData: {
+    level?: Level | string;  // level opsiyonel yapıldı
+    word: string;
+    partOfSpeech: string;
+    definition: string;
+    translation: string;
+    example: {
+      text: string;
+      translation: string;
+    };
+    details: {
+      synonyms: string[];
+      usageNotes: string;
+      additionalExamples: Array<{
+        text: string;
+        translation: string;
+      }>;
+    };
+  };
+};
+
+// CardHeader bileşeni güncellendi
+const CardHeader: React.FC<CardHeaderProps> = ({ level = 'A1', isFavorite, onToggleFavorite, onPlaySound }) => (
+  <View style={styles.header}>
+    <View style={styles.headerLeft}>
+      <View style={styles.levelBadge}>
+        <Text style={styles.levelText}>{level}</Text>
+      </View>
+      <TouchableOpacity onPress={onToggleFavorite} style={styles.iconButton}>
+        <Ionicons
+          name={isFavorite ? "heart" : "heart-outline"}
+          size={24}
+          color={isFavorite ? "#FF6B6B" : "#9CA3AF"}
+        />
+      </TouchableOpacity>
+    </View>
+    <TouchableOpacity onPress={onPlaySound} style={styles.soundButton}>
+      <Ionicons name="volume-high" size={24} color="#4CACBC" />
+    </TouchableOpacity>
+  </View>
+);
+
+// 1. WordSectionProps tipinin doğru tanımlandığından emin ol
+type WordSectionProps = {
+  word: string;
+  partOfSpeech: string;
+};
+
+// 2. WordSection bileşeninin doğru şekilde tanımlandığını ve kullanılabilir olduğunu doğrula
+const WordSection: React.FC<WordSectionProps> = ({ word, partOfSpeech }) => (
+  <View style={styles.wordSection}>
+    <Text style={styles.wordText}>{word}</Text>
+    <Text style={styles.partOfSpeech}>({partOfSpeech})</Text>
+  </View>
+);
+
+const NoteModal: React.FC<NoteModalProps> = ({ note, onChangeNote, onSave, onClose }) => (
+  <KeyboardAvoidingView
+    behavior={Platform.OS === "ios" ? "padding" : "height"}
+    style={styles.noteModalOverlay}
+  >
+    <View style={styles.noteModalContent}>
+      <View style={styles.noteModalHeader}>
+        <TouchableOpacity onPress={onClose} style={styles.modalHeaderButton}>
+          <Ionicons name="close-circle" size={28} color="#FF6B6B" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onSave}
+          disabled={!note.trim()}
+          style={[styles.modalHeaderButton, !note.trim() && styles.modalHeaderButtonDisabled]}
+        >
+          <Ionicons
+            name="checkmark-circle"
+            size={28}
+            color={note.trim() ? "#6BCB77" : "#2A3C50"}
+          />
+        </TouchableOpacity>
+      </View>
+      <TextInput
+        value={note}
+        onChangeText={onChangeNote}
+        style={styles.noteInput}
+        placeholder="Notunuzu yazın..."
+        placeholderTextColor="#6B7280"
+        multiline
+        maxLength={200}
+        autoFocus
+      />
+    </View>
+  </KeyboardAvoidingView>
+);
+
+// Main Component
+const WordCard: React.FC = () => {
+  const [isFavorite, setIsFavorite] = useState<boolean>(false);
+  const [currentWordIndex, setCurrentWordIndex] = useState<number>(0);
+  const wordData = words[currentWordIndex];
+
+  const { isFlipped, flipCard, frontAnimatedStyle, backAnimatedStyle } = useFlipAnimation();
+  const {
+    notes,
+    note,
+    showNoteInput,
+    setNote,
+    setShowNoteInput,
+    handleAddNote,
+    handleEditNote,
+    handleDeleteNote,
+  } = useNotes();
+  const { progress, increaseProgress, decreaseProgress } = useProgress();
+
+  const handlePlaySound = () => {
+    // Implement sound playing logic
+    console.log('Playing sound...');
+  };
+
+  // Platform-specific shadow stilleri
+  const cardShadow = useMemo(() => Platform.select({
+    ios: {
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.4,
+      shadowRadius: 16,
+    },
+    android: {
+      elevation: 12,
+    },
+  }), []);
+
+  // Memory leak'i önlemek için cleanup
+  useEffect(() => {
+    return () => {
+      // Diğer cleanup işlemleri
+    };
+  }, []);
+
+  // wordData'nın tanımlı olduğunu kontrol et
+  if (!wordData) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>Kelime verisi yükleniyor...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      {/* Ana içerik - Tek ScrollView */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Progress Bar */}
         <View style={styles.progressContainer}>
-          <RNAnimated.View
+          <Animated.View
             style={[
               styles.progressBar,
               {
@@ -146,60 +333,30 @@ const WordCard = () => {
           />
         </View>
 
-        {/* Card Container */}
         <View style={styles.cardContainer}>
-          {/* Front of Card */}
-          <RNAnimated.View
+          <Animated.View
             style={[styles.card, frontAnimatedStyle, isFlipped && styles.cardHidden]}
             pointerEvents={isFlipped ? 'none' : 'auto'}
           >
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <View style={styles.levelBadge}>
-                  <Text style={styles.levelText}>A1</Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setIsFavorite(!isFavorite)}
-                  style={styles.iconButton}
-                >
-                  <Ionicons
-                    name={isFavorite ? "heart" : "heart-outline"}
-                    size={24}
-                    color={isFavorite ? "#FF6B6B" : "#9CA3AF"}
-                  />
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity style={styles.soundButton}>
-                <Ionicons name="volume-high" size={24} color="#4CACBC" />
-              </TouchableOpacity>
-            </View>
+            <CardHeader
+              level={wordData.level}
+              isFavorite={isFavorite}
+              onToggleFavorite={() => setIsFavorite(!isFavorite)}
+              onPlaySound={handlePlaySound}
+            />
 
-            {/* Word Section */}
-            <View style={styles.wordSection}>
-              <Text style={styles.wordText}>homework</Text>
-              <Text style={styles.partOfSpeech}>(noun)</Text>
-            </View>
+            <WordSection word={wordData.word} partOfSpeech={wordData.partOfSpeech} />
 
-            {/* Definition Section */}
             <View style={styles.definitionSection}>
-              <Text style={styles.definitionText}>
-                school work that a pupil is required to do at home
-              </Text>
-              <Text style={styles.translationText}>ev ödevi, ödev</Text>
+              <Text style={styles.definitionText}>{wordData.definition}</Text>
+              <Text style={styles.translationText}>{wordData.translation}</Text>
             </View>
 
-            {/* Example Section */}
             <View style={styles.exampleSection}>
-              <Text style={styles.exampleText}>
-                I have a lot of homework to do.
-              </Text>
-              <Text style={styles.exampleTranslation}>
-                Yapacak bir sürü ödevim var.
-              </Text>
+              <Text style={styles.exampleText}>{wordData.example.text}</Text>
+              <Text style={styles.exampleTranslation}>{wordData.example.translation}</Text>
             </View>
 
-            {/* Notes Section */}
             {notes.length > 0 && (
               <View style={styles.allNotesSection}>
                 <Text style={styles.notesSectionTitle}>
@@ -210,23 +367,45 @@ const WordCard = () => {
                   showsVerticalScrollIndicator={false}
                   nestedScrollEnabled={true}
                 >
-                  {sortedNotes.map(renderNoteItem)}
+                  {notes.map((noteItem) => (
+                    <View key={noteItem.id} style={styles.noteItem}>
+                      <View style={styles.noteContent}>
+                        <Text style={styles.noteText}>{noteItem.text}</Text>
+                        <Text style={styles.noteTimestamp}>
+                          {new Date(noteItem.timestamp).toLocaleDateString()}
+                        </Text>
+                      </View>
+                      <View style={styles.noteActions}>
+                        <TouchableOpacity
+                          onPress={() => handleEditNote(noteItem)}
+                          style={[styles.noteActionButton, styles.editButton]}
+                        >
+                          <Ionicons name="pencil" size={16} color="#FFFFFF" />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteNote(noteItem.id)}
+                          style={[styles.noteActionButton, styles.deleteButton]}
+                        >
+                          <Ionicons name="trash-outline" size={16} color="#FFFFFF" />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ))}
                 </ScrollView>
               </View>
             )}
 
-            {/* Footer */}
             <View style={styles.footer}>
               <TouchableOpacity
                 style={styles.footerButton}
-                onPress={() => setProgress(Math.max(0, progress - 10))}
+                onPress={decreaseProgress}
               >
                 <Ionicons name="refresh" size={24} color="#6B7280" />
                 <Text style={styles.footerButtonText}>Atla</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.footerButton}
-                onPress={() => setProgress(Math.min(100, progress + 10))}
+                onPress={increaseProgress}
               >
                 <Ionicons name="thumbs-up" size={24} color="#6B7280" />
                 <Text style={styles.footerButtonText}>Biliyorum</Text>
@@ -246,10 +425,9 @@ const WordCard = () => {
                 <Text style={styles.footerButtonText}>Detaylar</Text>
               </TouchableOpacity>
             </View>
-          </RNAnimated.View>
+          </Animated.View>
 
-          {/* Back of Card */}
-          <RNAnimated.View
+          <Animated.View
             style={[styles.card, styles.cardBack, backAnimatedStyle, !isFlipped && styles.cardHidden]}
             pointerEvents={isFlipped ? 'auto' : 'none'}
           >
@@ -259,35 +437,23 @@ const WordCard = () => {
               <View style={styles.detailsSection}>
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>Eş Anlamlılar</Text>
-                  <Text style={styles.detailText}>assignment, schoolwork, study</Text>
+                  <Text style={styles.detailText}>{wordData.details.synonyms.join(', ')}</Text>
                 </View>
 
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>Kullanım Notları</Text>
-                  <Text style={styles.detailText}>
-                    "Homework" sayılamaz bir isimdir. "a piece of homework" veya "some homework" şeklinde kullanılır.
-                  </Text>
+                  <Text style={styles.detailText}>{wordData.details.usageNotes}</Text>
                 </View>
 
                 <View style={styles.detailItem}>
                   <Text style={styles.detailLabel}>Ek Örnekler</Text>
                   <View style={styles.detailExamples}>
-                    <View style={styles.detailExample}>
-                      <Text style={styles.detailExampleText}>
-                        Have you finished your homework?
-                      </Text>
-                      <Text style={styles.detailExampleTranslation}>
-                        Ödevini bitirdin mi?
-                      </Text>
-                    </View>
-                    <View style={styles.detailExample}>
-                      <Text style={styles.detailExampleText}>
-                        She always does her homework on time.
-                      </Text>
-                      <Text style={styles.detailExampleTranslation}>
-                        O her zaman ödevini zamanında yapar.
-                      </Text>
-                    </View>
+                    {wordData.details.additionalExamples.map((example, index) => (
+                      <View key={index} style={styles.detailExample}>
+                        <Text style={styles.detailExampleText}>{example.text}</Text>
+                        <Text style={styles.detailExampleTranslation}>{example.translation}</Text>
+                      </View>
+                    ))}
                   </View>
                 </View>
               </View>
@@ -299,60 +465,30 @@ const WordCard = () => {
             >
               <Text style={styles.flipBackButtonText}>Kartı Çevir</Text>
             </TouchableOpacity>
-          </RNAnimated.View>
+          </Animated.View>
         </View>
       </ScrollView>
 
-      {/* Not ekleme modal */}
       {showNoteInput && (
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={styles.noteModalOverlay}
-        >
-          <View style={styles.noteModalContent}>
-            <View style={styles.noteModalHeader}>
-              <TouchableOpacity
-                onPress={() => {
-                  setNote('');
-                  setShowNoteInput(false);
-                  setEditingNoteId(null);
-                }}
-                style={styles.modalHeaderButton}
-              >
-                <Ionicons name="close-circle" size={28} color="#FF6B6B" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handleAddNote}
-                disabled={!note.trim()}
-                style={[styles.modalHeaderButton, !note.trim() && styles.modalHeaderButtonDisabled]}
-              >
-                <Ionicons name="checkmark-circle" size={28} color={note.trim() ? "#6BCB77" : "#2A3C50"} />
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              style={styles.noteInput}
-              placeholder="Notunuzu yazın..."
-              placeholderTextColor="#6B7280"
-              multiline
-              maxLength={200}
-              autoFocus
-            />
-          </View>
-        </KeyboardAvoidingView>
+        <NoteModal
+          note={note}
+          onChangeNote={setNote}
+          onSave={handleAddNote}
+          onClose={() => {
+            setNote('');
+            setShowNoteInput(false);
+          }}
+        />
       )}
     </View>
   );
 };
 
+// Styles dışarı alındı
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0A0A0A',
-  },
-  keyboardAvoidingView: {
-    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -360,7 +496,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     padding: 16,
     paddingBottom: 32,
-    flexGrow: 1, // Bu eklendi
+    flexGrow: 1,
   },
   progressContainer: {
     height: 6,
@@ -377,7 +513,7 @@ const styles = StyleSheet.create({
     height: CARD_HEIGHT,
     position: 'relative',
     width: width - 32,
-    marginBottom: 32, // Bu eklendi
+    marginBottom: 32,
   },
   card: {
     position: 'absolute',
@@ -496,13 +632,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#2A3C50',
-    maxHeight: CARD_HEIGHT * 0.3, // Kartın %30'u kadar
-  },
-  notesListContainer: {
-    width: '100%',
-  },
-  notesScrollView: {
-    flex: 1,
+    maxHeight: CARD_HEIGHT * 0.3,
   },
   notesSectionTitle: {
     fontSize: 15,
@@ -511,18 +641,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     letterSpacing: 0.5,
   },
-  moreNotesButton: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#2A3C50',
-    borderRadius: 12,
-    marginTop: 8,
-  },
-  moreNotesText: {
-    color: '#4CACBC',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
+  notesScrollView: {
+    flex: 1,
   },
   noteItem: {
     backgroundColor: '#2A3C50',
@@ -560,61 +680,6 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#FF6B6B',
-  },
-  noteInputSection: {
-    marginTop: 20,
-    marginBottom: 20,
-    backgroundColor: '#0A0A0A',
-    borderTopWidth: 1,
-    borderTopColor: '#2A3C50',
-  },
-  noteInputContainer: {
-    backgroundColor: '#1A2634',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#2A3C50',
-    margin: 16,
-  },
-  noteInput: {
-    fontSize: 15,
-    color: '#E0E0E0',
-    minHeight: 100,
-    textAlignVertical: 'top',
-    padding: 0,
-    lineHeight: 22,
-  },
-  noteInputButtons: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 16,
-  },
-  cancelButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: '#2A2A2A',
-    marginRight: 12,
-  },
-  cancelButtonText: {
-    color: '#A0A0A0',
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  saveButton: {
-    backgroundColor: '#4CACBC',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  saveButtonDisabled: {
-    backgroundColor: '#2A3C50',
-    opacity: 0.7,
-  },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '500',
   },
   footer: {
     flexDirection: 'row',
@@ -697,7 +762,6 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-
   noteModalContent: {
     backgroundColor: '#1A2634',
     borderTopLeftRadius: 20,
@@ -719,6 +783,22 @@ const styles = StyleSheet.create({
   modalHeaderButtonDisabled: {
     opacity: 0.5,
   },
+  noteInput: {
+    fontSize: 15,
+    color: '#E0E0E0',
+    minHeight: 100,
+    textAlignVertical: 'top',
+    padding: 0,
+    lineHeight: 22,
+  },
+  // 4. Hata mesajları için gerekli stilleri ekle
+  errorText: {
+    color: '#FF6B6B',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
+  },
 });
 
-export default WordCard;
+export type { WordCardProps, Note, Level };  // Level tipini de export ediyoruz
+export default React.memo(WordCard);
