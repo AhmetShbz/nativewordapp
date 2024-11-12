@@ -125,190 +125,200 @@ const WordCard = () => {
   const sortedNotes = [...notes].sort((a, b) => b.timestamp - a.timestamp);
 
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      {/* Ana içerik */}
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
-        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Progress Bar */}
-        <View style={styles.progressContainer}>
-          <RNAnimated.View
-            style={[
-              styles.progressBar,
-              {
-                width: `${progress}%`,
-                backgroundColor: progress < 33 ? '#FF6B6B' : progress < 66 ? '#FFD93D' : '#6BCB77'
-              }
-            ]}
-          />
-        </View>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={[
+            styles.contentContainer,
+            showNoteInput && { paddingBottom: 200 } // Not input açıkken extra padding
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Progress Bar */}
+          <View style={styles.progressContainer}>
+            <RNAnimated.View
+              style={[
+                styles.progressBar,
+                {
+                  width: `${progress}%`,
+                  backgroundColor: progress < 33 ? '#FF6B6B' : progress < 66 ? '#FFD93D' : '#6BCB77'
+                }
+              ]}
+            />
+          </View>
 
-        {/* Card Container */}
-        <View style={styles.cardContainer}>
-          {/* Front of Card */}
-          <RNAnimated.View
-            style={[styles.card, frontAnimatedStyle, isFlipped && styles.cardHidden]}
-            pointerEvents={isFlipped ? 'none' : 'auto'}
-          >
-            {/* Header */}
-            <View style={styles.header}>
-              <View style={styles.headerLeft}>
-                <View style={styles.levelBadge}>
-                  <Text style={styles.levelText}>A1</Text>
+          {/* Card Container */}
+          <View style={styles.cardContainer}>
+            {/* Front of Card */}
+            <RNAnimated.View
+              style={[styles.card, frontAnimatedStyle, isFlipped && styles.cardHidden]}
+              pointerEvents={isFlipped ? 'none' : 'auto'}
+            >
+              {/* Header */}
+              <View style={styles.header}>
+                <View style={styles.headerLeft}>
+                  <View style={styles.levelBadge}>
+                    <Text style={styles.levelText}>A1</Text>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => setIsFavorite(!isFavorite)}
+                    style={styles.iconButton}
+                  >
+                    <Ionicons
+                      name={isFavorite ? "heart" : "heart-outline"}
+                      size={24}
+                      color={isFavorite ? "#FF6B6B" : "#9CA3AF"}
+                    />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  onPress={() => setIsFavorite(!isFavorite)}
-                  style={styles.iconButton}
-                >
-                  <Ionicons
-                    name={isFavorite ? "heart" : "heart-outline"}
-                    size={24}
-                    color={isFavorite ? "#FF6B6B" : "#9CA3AF"}
-                  />
+                <TouchableOpacity style={styles.soundButton}>
+                  <Ionicons name="volume-high" size={24} color="#4CACBC" />
                 </TouchableOpacity>
               </View>
-              <TouchableOpacity style={styles.soundButton}>
-                <Ionicons name="volume-high" size={24} color="#4CACBC" />
-              </TouchableOpacity>
-            </View>
 
-            {/* Word Section */}
-            <View style={styles.wordSection}>
-              <Text style={styles.wordText}>homework</Text>
-              <Text style={styles.partOfSpeech}>(noun)</Text>
-            </View>
-
-            {/* Definition Section */}
-            <View style={styles.definitionSection}>
-              <Text style={styles.definitionText}>
-                school work that a pupil is required to do at home
-              </Text>
-              <Text style={styles.translationText}>ev ödevi, ödev</Text>
-            </View>
-
-            {/* Example Section */}
-            <View style={styles.exampleSection}>
-              <Text style={styles.exampleText}>
-                I have a lot of homework to do.
-              </Text>
-              <Text style={styles.exampleTranslation}>
-                Yapacak bir sürü ödevim var.
-              </Text>
-            </View>
-
-            {/* Notes Section */}
-            {notes.length > 0 && (
-              <View style={styles.allNotesSection}>
-                <Text style={styles.notesSectionTitle}>
-                  Notlarım {notes.length > 0 && `(${notes.length})`}
-                </Text>
-                <ScrollView 
-                  style={styles.notesScrollView}
-                  showsVerticalScrollIndicator={false}
-                  nestedScrollEnabled={true}
-                >
-                  {sortedNotes.map(renderNoteItem)}
-                </ScrollView>
+              {/* Word Section */}
+              <View style={styles.wordSection}>
+                <Text style={styles.wordText}>homework</Text>
+                <Text style={styles.partOfSpeech}>(noun)</Text>
               </View>
-            )}
 
-            {/* Footer */}
-            <View style={styles.footer}>
-              <TouchableOpacity
-                style={styles.footerButton}
-                onPress={() => setProgress(Math.max(0, progress - 10))}
-              >
-                <Ionicons name="refresh" size={24} color="#6B7280" />
-                <Text style={styles.footerButtonText}>Atla</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.footerButton}
-                onPress={() => setProgress(Math.min(100, progress + 10))}
-              >
-                <Ionicons name="thumbs-up" size={24} color="#6B7280" />
-                <Text style={styles.footerButtonText}>Biliyorum</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.footerButton}
-                onPress={() => setShowNoteInput(true)}
-              >
-                <Ionicons name="create-outline" size={24} color="#6B7280" />
-                <Text style={styles.footerButtonText}>Not Ekle</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.footerButton}
-                onPress={flipCard}
-              >
-                <Ionicons name="book" size={24} color="#6B7280" />
-                <Text style={styles.footerButtonText}>Detaylar</Text>
-              </TouchableOpacity>
-            </View>
-          </RNAnimated.View>
+              {/* Definition Section */}
+              <View style={styles.definitionSection}>
+                <Text style={styles.definitionText}>
+                  school work that a pupil is required to do at home
+                </Text>
+                <Text style={styles.translationText}>ev ödevi, ödev</Text>
+              </View>
 
-          {/* Back of Card */}
-          <RNAnimated.View
-            style={[styles.card, styles.cardBack, backAnimatedStyle, !isFlipped && styles.cardHidden]}
-            pointerEvents={isFlipped ? 'auto' : 'none'}
-          >
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={styles.detailsTitle}>Detaylar</Text>
+              {/* Example Section */}
+              <View style={styles.exampleSection}>
+                <Text style={styles.exampleText}>
+                  I have a lot of homework to do.
+                </Text>
+                <Text style={styles.exampleTranslation}>
+                  Yapacak bir sürü ödevim var.
+                </Text>
+              </View>
 
-              <View style={styles.detailsSection}>
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Eş Anlamlılar</Text>
-                  <Text style={styles.detailText}>assignment, schoolwork, study</Text>
-                </View>
-
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Kullanım Notları</Text>
-                  <Text style={styles.detailText}>
-                    "Homework" sayılamaz bir isimdir. "a piece of homework" veya "some homework" şeklinde kullanılır.
+              {/* Notes Section */}
+              {notes.length > 0 && (
+                <View style={styles.allNotesSection}>
+                  <Text style={styles.notesSectionTitle}>
+                    Notlarım {notes.length > 0 && `(${notes.length})`}
                   </Text>
+                  <ScrollView
+                    style={styles.notesScrollView}
+                    showsVerticalScrollIndicator={false}
+                    nestedScrollEnabled={true}
+                  >
+                    {sortedNotes.map(renderNoteItem)}
+                  </ScrollView>
                 </View>
+              )}
 
-                <View style={styles.detailItem}>
-                  <Text style={styles.detailLabel}>Ek Örnekler</Text>
-                  <View style={styles.detailExamples}>
-                    <View style={styles.detailExample}>
-                      <Text style={styles.detailExampleText}>
-                        Have you finished your homework?
-                      </Text>
-                      <Text style={styles.detailExampleTranslation}>
-                        Ödevini bitirdin mi?
-                      </Text>
-                    </View>
-                    <View style={styles.detailExample}>
-                      <Text style={styles.detailExampleText}>
-                        She always does her homework on time.
-                      </Text>
-                      <Text style={styles.detailExampleTranslation}>
-                        O her zaman ödevini zamanında yapar.
-                      </Text>
+              {/* Footer */}
+              <View style={styles.footer}>
+                <TouchableOpacity
+                  style={styles.footerButton}
+                  onPress={() => setProgress(Math.max(0, progress - 10))}
+                >
+                  <Ionicons name="refresh" size={24} color="#6B7280" />
+                  <Text style={styles.footerButtonText}>Atla</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.footerButton}
+                  onPress={() => setProgress(Math.min(100, progress + 10))}
+                >
+                  <Ionicons name="thumbs-up" size={24} color="#6B7280" />
+                  <Text style={styles.footerButtonText}>Biliyorum</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.footerButton}
+                  onPress={() => setShowNoteInput(true)}
+                >
+                  <Ionicons name="create-outline" size={24} color="#6B7280" />
+                  <Text style={styles.footerButtonText}>Not Ekle</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.footerButton}
+                  onPress={flipCard}
+                >
+                  <Ionicons name="book" size={24} color="#6B7280" />
+                  <Text style={styles.footerButtonText}>Detaylar</Text>
+                </TouchableOpacity>
+              </View>
+            </RNAnimated.View>
+
+            {/* Back of Card */}
+            <RNAnimated.View
+              style={[styles.card, styles.cardBack, backAnimatedStyle, !isFlipped && styles.cardHidden]}
+              pointerEvents={isFlipped ? 'auto' : 'none'}
+            >
+              <ScrollView showsVerticalScrollIndicator={false}>
+                <Text style={styles.detailsTitle}>Detaylar</Text>
+
+                <View style={styles.detailsSection}>
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Eş Anlamlılar</Text>
+                    <Text style={styles.detailText}>assignment, schoolwork, study</Text>
+                  </View>
+
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Kullanım Notları</Text>
+                    <Text style={styles.detailText}>
+                      "Homework" sayılamaz bir isimdir. "a piece of homework" veya "some homework" şeklinde kullanılır.
+                    </Text>
+                  </View>
+
+                  <View style={styles.detailItem}>
+                    <Text style={styles.detailLabel}>Ek Örnekler</Text>
+                    <View style={styles.detailExamples}>
+                      <View style={styles.detailExample}>
+                        <Text style={styles.detailExampleText}>
+                          Have you finished your homework?
+                        </Text>
+                        <Text style={styles.detailExampleTranslation}>
+                          Ödevini bitirdin mi?
+                        </Text>
+                      </View>
+                      <View style={styles.detailExample}>
+                        <Text style={styles.detailExampleText}>
+                          She always does her homework on time.
+                        </Text>
+                        <Text style={styles.detailExampleTranslation}>
+                          O her zaman ödevini zamanında yapar.
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 </View>
-              </View>
-            </ScrollView>
+              </ScrollView>
 
-            <TouchableOpacity
-              style={styles.flipBackButton}
-              onPress={flipCard}
-            >
-              <Text style={styles.flipBackButtonText}>Kartı Çevir</Text>
-            </TouchableOpacity>
-          </RNAnimated.View>
-        </View>
+              <TouchableOpacity
+                style={styles.flipBackButton}
+                onPress={flipCard}
+              >
+                <Text style={styles.flipBackButtonText}>Kartı Çevir</Text>
+              </TouchableOpacity>
+            </RNAnimated.View>
+          </View>
+        </ScrollView>
       </ScrollView>
 
-      {/* Note Input Overlay */}
+      {/* Not ekleme modal */}
       {showNoteInput && (
-        <View style={styles.noteInputOverlay}>
-          <View style={styles.noteInputContainer}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.noteModalOverlay}
+        >
+          <View style={styles.noteModalContent}>
             <TextInput
               value={note}
               onChangeText={setNote}
@@ -341,9 +351,9 @@ const WordCard = () => {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       )}
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
@@ -351,6 +361,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#0A0A0A',
+  },
+  keyboardAvoidingView: {
+    flex: 1,
   },
   scrollView: {
     flex: 1,
@@ -557,13 +570,10 @@ const styles = StyleSheet.create({
   deleteButton: {
     backgroundColor: '#FF6B6B',
   },
-  noteInputOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  noteInputSection: {
+    marginTop: 20,
+    marginBottom: 20,
     backgroundColor: '#0A0A0A',
-    padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#2A3C50',
   },
@@ -573,6 +583,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: '#2A3C50',
+    margin: 16,
   },
   noteInput: {
     fontSize: 15,
@@ -687,6 +698,23 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  noteModalOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+
+  noteModalContent: {
+    backgroundColor: '#1A2634',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#2A3C50',
+    borderBottomWidth: 0,
   },
 });
 
